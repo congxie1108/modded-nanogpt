@@ -1,4 +1,4 @@
-# Record: Track 3 Optimization -- SOAP-Shampoo with damping (#46 with Muon's step replaced by temporal-residual Shampoo) -- 2615 steps (n=16)
+# Track 3 result: SOAP-Shampoo with damping -- 2615 steps (n=16); 2620 steps including tuning runs (n=24)
 
 ## TL;DR
 
@@ -7,7 +7,7 @@ hidden-matrix optimizer replaced by two-sided temporal-residual Newton-Schulz Sh
 Shampoo factors. SOAP preconditioning and all of #46's update post-processing are kept. Retuned values: the
 hidden-matrix LR (0.0375 -> 0.0325) and the Tail-EMA readout (start 2400 -> 2000, tau 150 -> 200).
 
-- **2615 steps** on 16 pre-registered seeds (49-64): mean val_ema **3.27897**,
+- **2615 steps** on a 16-seed confirmation batch (49-64): mean val_ema **3.27897**,
   `(3.28 - mean) * sqrt(16) = 0.00412 >= 0.004` (2610 fails at 0.00292).
 - Pairwise test against #46 (3.27833 at 2690, n=8): `((3.27833 - 3.27897) + 0.75 * 0.0045) / sqrt(1/8 + 1/16) = 0.0063 >= 0.004`.
 - **Disclosure:** 8 earlier runs of the identical configuration (seeds 37-44) were used to choose the damping value.
@@ -17,6 +17,16 @@ hidden-matrix LR (0.0375 -> 0.0325) and the Tail-EMA readout (start 2400 -> 2000
   its published result.
 
 ![mean val_ema vs step](figure.svg)
+
+## Relation to other Track 3 submissions
+
+This is a SOAP-Shampoo optimization result and an improvement over the accepted #46 baseline (2690 steps),
+not a claim to the lowest step count among submitted methods. At the submission review on 2026-10-16,
+open PRs reported [2600 steps (#341)](https://github.com/KellerJordan/modded-nanogpt/pull/341),
+[2580 steps (#377)](https://github.com/KellerJordan/modded-nanogpt/pull/377), and
+[2540 steps (#384)](https://github.com/KellerJordan/modded-nanogpt/pull/384).
+These use different optimizer stacks. No statistical-superiority claim against those methods is made here;
+the pairwise score above compares only against the supplied #46 controls.
 
 ## Method
 
@@ -37,7 +47,7 @@ Per hidden matrix (`q`, `k`, `v`, `attn.proj`, `mlp.fc`, `mlp.proj` in each of t
 Unchanged from #46: AdamW for the embedding and head, bias-correction-free Adam for gains and biases, EMA-Nesterov,
 the PowerCool LR schedule (decay ends at step 2900), initialization, and the Tail-EMA readout (retuned below).
 
-| setting | #46 | this record |
+| setting | #46 | this result |
 |---|---|---|
 | hidden-matrix step | Muon (12-step Newton-Schulz polar factor) | Shampoo `L^(-1/4) X R^(-1/4)` on the SOAP output (`beta2=0.8`, `alpha=0.375`, `beta4=0.9`, damping 0.01) |
 | hidden-matrix LR (Muon units) | 0.0375 | **0.0325** |
@@ -46,7 +56,7 @@ the PowerCool LR schedule (decay ends at step 2900), initialization, and the Tai
 
 ## Result
 
-PyTorch 2.11.0, n = 16 seeds (49-64, fixed before the runs), val_ema = validation loss of the
+PyTorch 2.11.0, n = 16 confirmation seeds (49-64), val_ema = validation loss of the
 Tail-EMA readout:
 
 | seed | step 2610 | step 2615 | step 2620 | step 2630 |
@@ -76,15 +86,21 @@ Tail-EMA readout:
 ### Disclosure: tuning runs of the same configuration
 
 The damping value was chosen with paired screens. Eight of those runs (seeds 37-44) used exactly this configuration.
-They are not part of the pre-registered batch, but for completeness:
+They are separate from the confirmation batch. No registration artifact is included, so this submission
+does not claim independently documented pre-registration. Both aggregates are reported:
 
 | runs | n | first passing step | mean at that step | `(3.28 - mean) * sqrt(n)` |
 |---|---:|---:|---:|---:|
-| seeds 49-64 (pre-registered, claimed) | 16 | 2615 | 3.27897 | 0.00412 |
+| seeds 49-64 (confirmation batch) | 16 | 2615 | 3.27897 | 0.00412 |
 | seeds 37-44 (tuning runs) | 8 | 2635 | - | - |
 | all 24 runs | 24 | 2620 | 3.27885 | 0.00563 |
 
-### Evidence for the damping
+### Exploratory reports: damping
+
+The following tuning comparisons are reports from the supplied experiment write-up. The undamped and
+alternative-setting logs are not included, so the paired differences, t-statistics, and attributed step
+savings cannot be independently recomputed from this submission. They are exploratory observations;
+the submitted evidence establishes the final recipe's aggregate result and its comparison with #46.
 
 Paired against the same recipe without damping on the same seeds (val_ema difference at step 2630; negative is better):
 
@@ -94,7 +110,7 @@ Paired against the same recipe without damping on the same seeds (val_ema differ
 | **0.01** | 37-44 | **-0.0013** (6 of 8 better, paired t = -2.1) |
 | 0.03 | 41-44 | -0.0010 |
 
-All three values help and 0.01 is best. On fresh seeds, the 16-seed mean at step 2630 is 3.27800 with damping versus
+The reported screen favored 0.01 among these values. On fresh seeds, the 16-seed mean at step 2630 is 3.27800 with damping versus
 3.27884 for the previous undamped recipe (seeds 17-32). The damping limits how strongly the inverse fourth root
 amplifies directions whose eigenvalues lie far below the mean, which matters because the factors are short-memory
 EMAs (`beta2 = 0.8`) of low-rank statistics.
@@ -102,7 +118,7 @@ EMAs (`beta2 = 0.8`) of low-rank statistics.
 With damping on, the neighbouring settings were rechecked on seeds 41-44: LR 0.03 neutral, LR 0.035 worse; Shampoo
 `beta2` 0.7 marginally better (about 6 steps, not significant), 0.6 and 0.9 worse; damping 0.02 with `beta2` 0.7 worse.
 
-### Attribution (same seeds)
+### Exploratory reports: attribution (same seeds)
 
 `controls_46/` reruns #46's own script for seeds 17-24 and additionally evaluates our Tail-EMA readout
 on the same trajectory (evaluation only). Comparing these controls with the undamped version of this recipe on the
@@ -110,9 +126,10 @@ same seeds (step 2650, steps converted with the README's 0.0045 per 100 steps): 
 accounts for about 49 steps (paired t = 6.3, better on all 8 seeds), and the readout retune for about 20 steps (#46
 with our readout passes at 2675). Damping then adds roughly 20-30 steps (previous section).
 
-### Tried, did not help
+### Exploratory reports: settings that did not help
 
-Paired screens on one to eight seeds during tuning:
+The supplied write-up reports paired screens on one to eight seeds during tuning; the alternative-setting logs
+are not included:
 
 - LR decay ending at 2750-2850 or 2950-3000; matrix LR 0.025 / 0.03 / 0.0375 / 0.045; LR decay power 1.5.
 - Shampoo `beta2` 0.5 / 0.9 and `alpha` 0 / 0.6 (without damping); Shampoo statistics from the raw residual instead
@@ -146,13 +163,28 @@ All hyperparameters are hardcoded; only `--seed` varies. Dataset, batch size, ar
 `records/track_3_optimization/train_gpt_simple.py`; one forward-backward pass per step; no third-party optimizer
 imports.
 
-The logs embed the research version of this script, which exposes the hyperparameters (and options that are off in
-this configuration) as command-line flags. The runs were launched with `--seed <S> --train-steps 2700
---shampoo-damping 0.01`; every other flag is at the value hardcoded here. No schedule depends on the run length and
-validation is evaluation-only, so up to step 2650 the trajectory is the one `train_gpt_soap_shampoo.py` produces. A
-research script must be launched with those flags: extracting it from a logfile and running with defaults
-would use zero damping. A 40-step check on seed 49 (two runs of each script) gave differences between the scripts within the run-to-run
-nondeterminism of either one.
+### Reproduce the exact logged research configuration
+
+The logs embed the research trainer, while `train_gpt_soap_shampoo.py` is a simplified trainer with the
+active settings hardcoded. To extract the logged source and prepare a launcher with **every recorded
+argument**, run:
+
+```bash
+python3 records/track_3_optimization/results/20261015_soap_shampoo_damping/reproduce_log.py records/track_3_optimization/results/20261015_soap_shampoo_damping/seed49_05026440-e173-4c93-81e1-cb37471336de.txt /tmp/soap-shampoo-seed49
+NPROC_PER_NODE=2 bash /tmp/soap-shampoo-seed49/run.sh
+```
+
+Choose a new output directory: the helper refuses to overwrite an existing one. It only prepares files;
+the second command launches training. Repeat with each confirmation logfile to reproduce seeds 49-64.
+The output includes the extracted source, its SHA-256, the resolved configuration, and a launcher that runs
+from this repository root. No missing configuration values are inferred from research-trainer defaults.
+This helper targets the confirmation and tuning research logs; the #46 control logs use their separate trainer.
+
+The recorded runs use `--train-steps 2700 --shampoo-damping 0.01`; the simplified trainer stops at 2650.
+Both use schedule endpoint 2900. The research trainer without the recorded flags would use zero damping.
+The supplied write-up reports a 40-step comparison of the two trainers on seed 49; those comparison logs
+are not included. That check does not establish full-run equivalence. Use the extracted research trainer
+and recorded arguments for direct reproduction of the submitted runs.
 
 Hardware names, device metadata, and CUDA build/version details have been removed from filenames,
 logs, and logging statements in the embedded and standalone trainers. Numerical results and active
@@ -167,7 +199,10 @@ python3 records/track_3_optimization/results/20261015_soap_shampoo_damping/claim
 ```
 
 It checks the seed sets, duplicate validations, finite losses, and that the embedded training source parses
-and is identical within each batch. It recomputes the first passing common validation step for the claimed,
+and is identical within each batch. For the confirmation and tuning batches, it also requires every
+research-trainer option to appear in the resolved configuration, checks agreement within and across those
+batches, and compares every non-seed value with `expected_config.json`. The control trainer has its
+optimizer settings hardcoded in its embedded source and is checked separately. It recomputes the first passing common validation step for the claimed,
 tuning, combined and control batches, the raw-weight mean, and the step-adjusted pairwise score.
 These checks verify the supplied logs; they do not rerun GPU training or prove the logs' provenance.
 
@@ -175,7 +210,9 @@ These checks verify the supplied logs; they do not rerun GPU training or prove t
 
 - `train_gpt_soap_shampoo.py`: the submission script.
 - `run.sh`: repository-root-aware launcher (defaults: two GPUs, seed 49).
-- `claim_stats.py`: dependency-free verification of the log statistics.
+- `claim_stats.py`: dependency-free verification of configurations and log statistics.
+- `expected_config.json`: recorded non-seed configuration shared by all 24 SOAP-Shampoo runs.
+- `reproduce_log.py`: extracts the logged research trainer and prepares its complete launch command.
 - `PR_SUMMARY.md`: prepared pull-request title and description.
 - `seed{49..64}_*.txt`: the 16 claimed runs.
 - `tuning_runs_same_config/seed{37..44}_*.txt`: the 8 tuning runs of the same configuration (see Disclosure).
