@@ -1,4 +1,4 @@
-"""Recompute the submission's statistics from the unmodified logs (stdlib only)."""
+"""Recompute the submission's statistics from the submitted logs (stdlib only)."""
 import ast
 import hashlib
 import math
@@ -13,7 +13,7 @@ ROW = re.compile(r"^step:(\d+)/\d+ val_loss:([\d.]+) val_ema_loss:([\d.]+)", re.
 def load_runs(folder, expected_seeds):
     runs = {}
     source_hashes = set()
-    for path in sorted(folder.glob('H100_*.txt')):
+    for path in sorted(folder.glob('*seed*.txt')):
         text = path.read_text()
         source, metadata = text.split('=' * 100, 1)
         ast.parse(source, filename=str(path))
@@ -64,13 +64,13 @@ def main():
         print(f'  step={s}, mean={loss:.9f}, score={score:.9f}, pass={score >= 0.004}')
     tuning_step, _ = summary('Tuning seeds 37-44', tuning)
     all_step, _ = summary('All seeds (tuning included)', {**tuning, **claimed})
-    control_step, control_mean = summary('#46 same-hardware controls', controls)
+    control_step, control_mean = summary('#46 comparison controls', controls)
     assert (tuning_step, all_step, control_step) == (2635, 2620, 2690)
     raw = statistics.mean(rows[step][0] for rows in claimed.values())
     pairwise = ((control_mean - mean) + (control_step - step) / 100 * 0.0045) / math.sqrt(
         1 / len(controls) + 1 / len(claimed))
     print(f'Raw-weight mean at {step}: {raw:.9f}')
-    print(f'Pairwise score vs #46 same-hardware controls: {pairwise:.9f} (required >= 0.004)')
+    print(f'Pairwise score vs #46 comparison controls: {pairwise:.9f} (required >= 0.004)')
     assert pairwise >= 0.004
 
 

@@ -13,10 +13,10 @@ hidden-matrix LR (0.0375 -> 0.0325) and the Tail-EMA readout (start 2400 -> 2000
 - **Disclosure:** 8 earlier runs of the identical configuration (seeds 37-44) were used to choose the damping value.
   Including them (n=24), the first passing step is **2620** (mean 3.27885, 0.00563). Their logs are in
   `tuning_runs_same_config/`.
-- Same-hardware control: #46 rerun on our machine (seeds 17-24) passes at **2690** with mean **3.27833**, identical to
+- Comparison control: #46 rerun (seeds 17-24) passes at **2690** with mean **3.27833**, identical to
   its published result.
 
-![mean val_ema vs step](figure.png)
+![mean val_ema vs step](figure.svg)
 
 ## Method
 
@@ -46,7 +46,7 @@ the PowerCool LR schedule (decay ends at step 2900), initialization, and the Tai
 
 ## Result
 
-2 x H100 per run, PyTorch 2.11.0+cu130, n = 16 seeds (49-64, fixed before the runs), val_ema = validation loss of the
+PyTorch 2.11.0, n = 16 seeds (49-64, fixed before the runs), val_ema = validation loss of the
 Tail-EMA readout:
 
 | seed | step 2610 | step 2615 | step 2620 | step 2630 |
@@ -102,9 +102,9 @@ EMAs (`beta2 = 0.8`) of low-rank statistics.
 With damping on, the neighbouring settings were rechecked on seeds 41-44: LR 0.03 neutral, LR 0.035 worse; Shampoo
 `beta2` 0.7 marginally better (about 6 steps, not significant), 0.6 and 0.9 worse; damping 0.02 with `beta2` 0.7 worse.
 
-### Attribution (same hardware, same seeds)
+### Attribution (same seeds)
 
-`controls_46/` reruns #46's own script on our machine for seeds 17-24 and additionally evaluates our Tail-EMA readout
+`controls_46/` reruns #46's own script for seeds 17-24 and additionally evaluates our Tail-EMA readout
 on the same trajectory (evaluation only). Comparing these controls with the undamped version of this recipe on the
 same seeds (step 2650, steps converted with the README's 0.0045 per 100 steps): the Shampoo step at its tuned LR
 accounts for about 49 steps (paired t = 6.3, better on all 8 seeds), and the readout retune for about 20 steps (#46
@@ -126,7 +126,7 @@ Paired screens on one to eight seeds during tuning:
 
 ## Reproducing
 
-Run from the repository root on a CUDA machine, following the Track 3 quickstart:
+Run from the repository root, following the Track 3 quickstart:
 
 ```bash
 python -m pip install torch==2.11.0 huggingface_hub
@@ -154,7 +154,9 @@ research script must be launched with those flags: extracting it from a logfile 
 would use zero damping. A 40-step check on seed 49 (two runs of each script) gave differences between the scripts within the run-to-run
 nondeterminism of either one.
 
-Wall-clock is about 2.0 s/step on 2 x H100 (#46: about 1.1 s/step); Track 3 does not measure it.
+Hardware names, device metadata, and CUDA build/version details have been removed from filenames,
+logs, and logging statements in the embedded and standalone trainers. Numerical results and active
+training settings are unchanged.
 
 ## Verifying the submitted evidence
 
@@ -175,11 +177,12 @@ These checks verify the supplied logs; they do not rerun GPU training or prove t
 - `run.sh`: repository-root-aware launcher (defaults: two GPUs, seed 49).
 - `claim_stats.py`: dependency-free verification of the log statistics.
 - `PR_SUMMARY.md`: prepared pull-request title and description.
-- `H100_seed{49..64}_*.txt`: the 16 claimed runs.
-- `tuning_runs_same_config/H100_seed{37..44}_*.txt`: the 8 tuning runs of the same configuration (see Disclosure).
-- `controls_46/`: #46 rerun on the same hardware (seeds 17-24) with an extra evaluation-only readout, and the script
+- `seed{49..64}_*.txt`: the 16 claimed runs.
+- `tuning_runs_same_config/seed{37..44}_*.txt`: the 8 tuning runs of the same configuration (see Disclosure).
+- `controls_46/`: #46 rerun (seeds 17-24) with an extra evaluation-only readout, and the script
   used.
-- `figure.png`: mean val_ema of the claimed runs, the previous undamped recipe, #46 rerun here, and #46 as published.
+- `figure.svg`: mean val_ema of the claimed runs and the supplied #46 controls.
+- `make_figure.py`: regenerates the figure from the submitted logs using Python only.
 
 ## Credits
 
